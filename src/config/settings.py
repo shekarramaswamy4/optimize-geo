@@ -33,6 +33,14 @@ class Settings(BaseSettings):
     cors_allow_methods: list[str] = Field(default=["*"])
     cors_allow_headers: list[str] = Field(default=["*"])
     
+    # Database settings
+    database_url: str = Field(..., description="PostgreSQL database URL")
+    database_pool_size: int = Field(default=10, description="Database connection pool size")
+    database_max_overflow: int = Field(default=20, description="Maximum overflow connections")
+    database_pool_timeout: int = Field(default=30, description="Pool timeout in seconds")
+    database_pool_recycle: int = Field(default=3600, description="Recycle connections after N seconds")
+    database_echo: bool = Field(default=False, description="Echo SQL queries (debug)")
+    
     # OpenAI settings
     openai_api_key: str = Field(..., description="OpenAI API key")
     openai_model: str = Field(default="gpt-3.5-turbo", description="OpenAI model to use")

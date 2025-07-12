@@ -98,12 +98,16 @@ poetry run website-analyzer https://example.com --debug
 ### Using Docker
 
 ```bash
-# Build and run with docker-compose
-docker-compose up
+# For local development (just PostgreSQL)
+make db-up
+make run-server
+
+# For production (web + PostgreSQL)
+make prod-up
 
 # Or build manually
-docker build -t website-analyzer .
-docker run -p 8000:8000 -e OPENAI_API_KEY=$OPENAI_API_KEY website-analyzer
+docker build -t lumarank .
+docker run -p 8000:8000 -e OPENAI_API_KEY=$OPENAI_API_KEY lumarank
 ```
 
 ## API Endpoints

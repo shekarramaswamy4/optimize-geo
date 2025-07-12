@@ -12,6 +12,7 @@ from httpx import AsyncClient, Response
 # Set test environment variables before importing app
 os.environ["OPENAI_API_KEY"] = "test-api-key"
 os.environ["ENVIRONMENT"] = "testing"
+os.environ["DATABASE_URL"] = "postgresql://lumarank_test:lumarank_test_password@localhost:5433/lumarank_test_db"
 
 from src.config.settings import Settings
 from src.main import app
@@ -31,6 +32,7 @@ def test_settings() -> Settings:
     """Create test settings."""
     return Settings(
         openai_api_key="test-api-key",
+        database_url="postgresql://lumarank_test:lumarank_test_password@localhost:5433/lumarank_test_db",
         environment="testing",
         log_level="DEBUG",
         rate_limit_enabled=False,
@@ -161,6 +163,46 @@ def mock_successful_analysis() -> dict[str, Any]:
         "success_rate": 0.85,
         "metadata": {"website_url": "https://techcorp.com"},
     }
+
+
+# Database fixtures
+@pytest.fixture(scope="session")
+def test_database_url():
+    """Get test database URL."""
+    return os.environ.get(
+        "TEST_DATABASE_URL",
+        "postgresql://lumarank_test:lumarank_test_password@localhost:5433/lumarank_test_db"
+    )
+
+
+@pytest.fixture
+def test_db_engine(test_database_url):
+    """Create test database engine."""
+    from sqlalchemy import create_engine
+    
+    engine = create_engine(test_database_url)
+    yield engine
+    engine.dispose()
+
+
+@pytest.fixture
+def test_db_session(test_db_engine):
+    """Create test database session."""
+    from sqlalchemy.orm import sessionmaker
+    from src.models.database import Base
+    
+    # Create tables
+    Base.metadata.create_all(bind=test_db_engine)
+    
+    # Create session
+    Session = sessionmaker(bind=test_db_engine)
+    session = Session()
+    
+    yield session
+    
+    # Cleanup
+    session.close()
+    Base.metadata.drop_all(bind=test_db_engine)
 
 
 # Pytest plugins configuration

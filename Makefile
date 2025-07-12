@@ -1,4 +1,4 @@
-.PHONY: help install test test-unit test-integration test-performance test-all coverage lint format type-check clean run-server run-cli docker-build docker-run
+.PHONY: help install test test-unit test-integration test-performance test-all coverage lint format type-check clean run-server run-cli docker-build docker-run db-up db-down db-migrate db-rollback db-reset db-shell
 
 help: ## Show this help message
 	@echo "Usage: make [target]"
@@ -54,6 +54,45 @@ docker-build: ## Build Docker image
 
 docker-run: ## Run Docker container
 	docker run -p 8000:8000 -e OPENAI_API_KEY=$(OPENAI_API_KEY) lumarank
+
+prod-up: ## Start production environment (web + postgres)
+	docker-compose --profile prod up -d
+
+prod-down: ## Stop production environment
+	docker-compose --profile prod down
+
+prod-logs: ## View production logs
+	docker-compose --profile prod logs -f
+
+# Database commands
+db-up: ## Start PostgreSQL containers
+	docker-compose up -d postgres
+	@echo "Waiting for PostgreSQL to be ready..."
+	@sleep 5
+
+db-down: ## Stop PostgreSQL containers
+	docker-compose down postgres
+
+db-migrate: ## Run database migrations
+	poetry run alembic upgrade head
+
+db-rollback: ## Rollback last migration
+	poetry run alembic downgrade -1
+
+db-reset: ## Reset database (drop all tables and re-run migrations)
+	poetry run alembic downgrade base
+	poetry run alembic upgrade head
+
+db-shell: ## Open PostgreSQL shell
+	docker-compose exec postgres psql -U lumarank -d lumarank_db
+
+db-test-up: ## Start test PostgreSQL container
+	docker-compose --profile test up -d postgres_test
+	@echo "Waiting for test PostgreSQL to be ready..."
+	@sleep 5
+
+db-test-down: ## Stop test PostgreSQL container
+	docker-compose --profile test down
 
 # Development shortcuts
 dev: install ## Setup development environment

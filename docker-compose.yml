@@ -1,18 +1,63 @@
 version: '3.8'
 
 services:
+  # PostgreSQL for local development and production
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=lumarank
+      - POSTGRES_PASSWORD=lumarank_password
+      - POSTGRES_DB=lumarank_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lumarank"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - ""  # Default profile (always runs)
+      - dev
+      - prod
+
+  # Test database for running tests
+  postgres_test:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=lumarank_test
+      - POSTGRES_PASSWORD=lumarank_test_password
+      - POSTGRES_DB=lumarank_test_db
+    ports:
+      - "5433:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lumarank_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - test
+
+  # Web application (only for production)
   web:
     build: .
     ports:
       - "8000:8000"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DATABASE_URL=postgresql://lumarank:lumarank_password@postgres:5432/lumarank_db
       - ENVIRONMENT=production
       - LOG_LEVEL=INFO
       - LOG_FORMAT=json
       - WORKERS=4
     volumes:
       - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -20,6 +65,8 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
+    profiles:
+      - prod
 
   # Optional: Add Prometheus for monitoring
   prometheus:
@@ -50,5 +97,6 @@ services:
       - monitoring
 
 volumes:
+  postgres_data:
   prometheus_data:
   grafana_data:
