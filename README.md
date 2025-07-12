@@ -1,161 +1,186 @@
 # LumaRank
 
-A production-grade SEO analyzer that extracts business information and measures search discoverability through AI-generated search questions.
+A production-grade SEO analysis platform that helps businesses understand and improve their search engine discoverability through AI-powered insights.
 
-## Features
+## Overview
 
-- 🔍 **Website Analysis**: Extracts company information, features, and pricing from any website
-- 🤖 **AI-Powered**: Uses OpenAI GPT models to understand and analyze content
-- 📊 **SEO Scoring**: Generates and tests search questions to measure discoverability
-- 🚀 **Production-Ready**: Built with FastAPI, async support, and proper error handling
-- 📝 **Structured Logging**: JSON logging with request tracking and correlation IDs
-- 🐳 **Docker Support**: Ready for containerized deployment
-- 📈 **Metrics**: Prometheus metrics endpoint for monitoring
-- 🔒 **Rate Limiting**: Built-in rate limiting to prevent abuse
+LumaRank analyzes websites to extract business information and measures search discoverability by:
+- Extracting company details, features, and pricing from websites
+- Generating targeted search questions potential customers might ask
+- Testing those questions to measure how well the company appears in search results
+- Providing actionable SEO insights and scoring
 
-## Tech Stack
+## Architecture
 
-- **Framework**: FastAPI with Uvicorn
-- **AI**: OpenAI GPT-3.5/GPT-4
-- **Databases**: PostgreSQL + MongoDB
-- **Authentication**: Header-based with user context
+### Tech Stack
+
+- **Backend Framework**: FastAPI with async/await support
+- **Databases**: 
+  - PostgreSQL (users, entities, memberships) with SQLAlchemy ORM
+  - MongoDB (crawl data, analysis results) with PyMongo
+- **AI Integration**: OpenAI GPT models for content analysis
+- **Authentication**: Header-based with WorkOS integration
 - **Package Management**: Poetry
-- **Logging**: Structlog with JSON formatting
-- **Validation**: Pydantic v2
-- **HTTP Client**: HTTPX (async)
-- **Web Scraping**: BeautifulSoup4
-- **CLI**: Rich for beautiful terminal output
+- **Testing**: Pytest with 95%+ coverage
+- **Deployment**: Docker with multi-stage builds
+
+### Key Features
+
+- **Multi-tenant Architecture**: Support for multiple organizations (entities)
+- **Session-based Auth**: Complete session context with user, entity, and membership
+- **Automatic User Provisioning**: Creates users from WorkOS on first access
+- **Production-ready**: Structured logging, error handling, rate limiting, metrics
+- **Comprehensive Testing**: Unit, integration, and performance tests
 
 ## Installation
 
-### Using Poetry (Recommended)
+### Prerequisites
 
-```bash
-# Install Poetry if you haven't already
-curl -sSL https://install.python-poetry.org | python3 -
+- Python 3.11+
+- PostgreSQL 14+
+- MongoDB 6+
+- Poetry (for dependency management)
 
-# Install dependencies
-poetry install
+### Setup
 
-# Activate virtual environment
-poetry shell
-```
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd optimize-geo
+   ```
 
-### Using pip
+2. **Install dependencies**
+   ```bash
+   poetry install
+   ```
 
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+3. **Set up environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
 
-# Install dependencies
-pip install -r requirements.txt
-```
+4. **Set up databases**
+   ```bash
+   # Start databases with Docker
+   docker-compose up -d
+   
+   # Run PostgreSQL migrations
+   poetry run alembic upgrade head
+   ```
+
+5. **Run the application**
+   ```bash
+   # Development server
+   poetry run uvicorn src.main:app --reload
+   
+   # Production server
+   poetry run python scripts/run_server.py
+   ```
 
 ## Configuration
 
-1. Copy the example environment file:
-```bash
-cp .env.example .env
-```
+### Environment Variables
 
-2. Set your OpenAI API key:
-```bash
-export OPENAI_API_KEY="your-api-key-here"
-```
-
-## Usage
-
-### Running the API Server
+See `.env.example` for all configuration options. Key variables:
 
 ```bash
-# Using the run script
-python scripts/run_server.py
+# Database URLs
+DATABASE_URL=postgresql://user:pass@localhost:5432/dbname
+MONGO_URL=mongodb://localhost:27017
+MONGO_DATABASE=lumarank
 
-# Or directly with uvicorn
-uvicorn src.main:app --reload
+# Authentication
+WORKOS_API_KEY=sk_live_...
+WORKOS_CLIENT_ID=client_...
 
-# Or with Poetry
-poetry run uvicorn src.main:app --reload
+# OpenAI
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-3.5-turbo
+
+# Application
+ENVIRONMENT=development
+LOG_LEVEL=INFO
 ```
 
-The API will be available at `http://localhost:8000`
+## API Usage
 
-### Using the CLI
+### Authentication
 
-```bash
-# Analyze a website
-poetry run website-analyzer https://example.com
-
-# With custom company name
-poetry run website-analyzer https://example.com --company-name "Example Corp"
-
-# Quick analysis without testing questions
-poetry run website-analyzer https://example.com --no-test
-
-# Enable debug logging
-poetry run website-analyzer https://example.com --debug
-```
-
-### Using Docker
-
-```bash
-# For local development (just PostgreSQL)
-make db-up
-make run-server
-
-# For production (web + PostgreSQL)
-make prod-up
-
-# Or build manually
-docker build -t lumarank .
-docker run -p 8000:8000 -e OPENAI_API_KEY=$OPENAI_API_KEY lumarank
-```
-
-## API Endpoints
+All API endpoints require three authentication headers:
+- `x-email`: User's email address
+- `x-auth-id`: WorkOS user ID
+- `x-entity-id`: Organization/entity ID
 
 ### Core Endpoints
 
-- `POST /api/v1/analyze` - Full website analysis with question testing
-- `POST /api/v1/analyze/quick` - Quick analysis without testing
-- `POST /api/v1/test-questions` - Test pre-generated questions
-
-### Utility Endpoints
-
-- `GET /health` - Health check with dependency status
-- `GET /readiness` - Readiness probe
-- `GET /metrics` - Prometheus metrics (if enabled)
-- `GET /docs` - Interactive API documentation (development only)
-
-### Example API Usage
-
+#### Analyze Website
 ```bash
-# Full analysis (requires authentication)
-curl -X POST http://localhost:8000/api/v1/analyze \
-  -H "Content-Type: application/json" \
-  -H "x-email: user@example.com" \
-  -H "x-auth-id: auth_123" \
-  -d '{"website_url": "https://example.com"}'
-
-# Quick analysis (requires authentication)
-curl -X POST http://localhost:8000/api/v1/analyze/quick \
-  -H "Content-Type: application/json" \
-  -H "x-email: user@example.com" \
-  -H "x-auth-id: auth_123" \
-  -d '{"website_url": "https://example.com", "company_name": "Example Corp"}'
-
-# Check authentication status
-curl http://localhost:8000/api/v1/auth/check \
-  -H "x-email: user@example.com" \
-  -H "x-auth-id: auth_123"
-
-# Health check (no auth required)
-curl http://localhost:8000/health
+POST /api/v1/analyze
+{
+  "website_url": "https://example.com",
+  "company_name": "Example Corp",  # Optional
+  "test_questions": true           # Optional, default true
+}
 ```
 
-See [API_AUTH.md](API_AUTH.md) for detailed authentication documentation.
+#### Quick Analysis (No Testing)
+```bash
+POST /api/v1/analyze/quick
+{
+  "website_url": "https://example.com"
+}
+```
+
+#### Test Pre-generated Questions
+```bash
+POST /api/v1/test-questions
+{
+  "company_name": "Example Corp",
+  "questions": [
+    {
+      "question": "What is Example Corp?",
+      "question_type": "company_specific",
+      "intent": "Learn about company"
+    }
+  ]
+}
+```
+
+### Health & Monitoring
+
+- `GET /health` - Service health with dependency status
+- `GET /readiness` - Kubernetes readiness probe
+- `GET /metrics` - Prometheus metrics (if enabled)
 
 ## Development
+
+### Project Structure
+
+```
+.
+├── src/
+│   ├── api/              # API routes and middleware
+│   │   ├── routers/      # Endpoint definitions
+│   │   ├── auth.py       # Authentication logic
+│   │   └── middleware.py # Request tracking, logging
+│   ├── config/           # Configuration management
+│   ├── core/             # Core business logic
+│   │   ├── auth.py       # Auth models and context
+│   │   └── workos_client.py # WorkOS integration
+│   ├── database/         # Database layer
+│   │   ├── postgres/     # PostgreSQL models and connection
+│   │   └── mongo/        # MongoDB models and repositories
+│   ├── models/           # Pydantic schemas
+│   ├── services/         # Business logic services
+│   ├── utils/            # Utilities (logging, etc.)
+│   ├── cli.py           # CLI interface
+│   └── main.py          # FastAPI application
+├── tests/               # Test suite
+├── migrations/          # Alembic migrations
+├── scripts/             # Utility scripts
+└── docker-compose.yml   # Local development setup
+```
 
 ### Running Tests
 
@@ -163,11 +188,14 @@ See [API_AUTH.md](API_AUTH.md) for detailed authentication documentation.
 # Run all tests
 poetry run pytest
 
-# With coverage
-poetry run pytest --cov=src --cov-report=html
+# Run with coverage
+poetry run pytest --cov=src
 
 # Run specific test file
-poetry run pytest tests/test_analyzer.py
+poetry run pytest tests/unit/test_analyzer_service.py
+
+# Run with verbose output
+poetry run pytest -v
 ```
 
 ### Code Quality
@@ -183,73 +211,66 @@ poetry run ruff src tests
 poetry run mypy src
 ```
 
-### Pre-commit Hooks
+### Database Migrations
 
 ```bash
-# Install pre-commit hooks
-poetry run pre-commit install
+# Create new migration
+poetry run alembic revision -m "Description"
 
-# Run manually
-poetry run pre-commit run --all-files
+# Apply migrations
+poetry run alembic upgrade head
+
+# Rollback one migration
+poetry run alembic downgrade -1
 ```
 
-## Project Structure
+## Docker Deployment
 
-```
-.
-├── src/
-│   ├── api/           # FastAPI routers and dependencies
-│   ├── config/        # Configuration management
-│   ├── core/          # Core business logic and exceptions
-│   ├── models/        # Pydantic models
-│   ├── services/      # Service layer (analyzer)
-│   ├── utils/         # Utilities (logging, etc.)
-│   ├── cli.py         # CLI application
-│   └── main.py        # FastAPI application
-├── tests/             # Test suite
-├── scripts/           # Utility scripts
-├── docker-compose.yml # Docker composition
-├── Dockerfile         # Docker configuration
-├── pyproject.toml     # Poetry configuration
-└── README.md          # This file
+### Build and Run
+
+```bash
+# Build image
+docker build -t lumarank .
+
+# Run with environment file
+docker run --env-file .env -p 8000:8000 lumarank
+
+# Using docker-compose
+docker-compose up
 ```
 
-## Environment Variables
-
-See `.env.example` for all available configuration options. Key variables:
-
-- `OPENAI_API_KEY` - Required OpenAI API key
-- `ENVIRONMENT` - Environment (development/staging/production)
-- `LOG_LEVEL` - Logging level (DEBUG/INFO/WARNING/ERROR)
-- `PORT` - Server port (default: 8000)
-- `WORKERS` - Number of worker processes (default: 4)
-
-## Monitoring
+### Production Deployment
 
 The application includes:
+- Multi-stage Docker builds for smaller images
+- Health checks for container orchestration
+- Prometheus metrics for monitoring
+- Structured JSON logging
+- Graceful shutdown handling
 
-- Structured JSON logging with request correlation
-- Prometheus metrics endpoint at `/metrics`
-- Health checks at `/health` and `/readiness`
-- Request/response timing and error tracking
+## Security
 
-## Security Considerations
+- **Authentication**: Header-based with WorkOS integration
+- **Authorization**: Role-based access control (member, admin, owner)
+- **Data Isolation**: Multi-tenant with entity-based data separation
+- **API Security**: Rate limiting, CORS configuration
+- **Secret Management**: All secrets via environment variables
 
-- Never commit `.env` files or API keys
-- Use environment variables for sensitive configuration
-- Enable rate limiting in production
-- Run as non-root user in containers
-- Keep dependencies updated regularly
+## Monitoring & Observability
 
-## License
-
-This project is proprietary and confidential.
+- **Structured Logging**: JSON logs with correlation IDs
+- **Metrics**: Prometheus metrics endpoint
+- **Health Checks**: Detailed health status with dependencies
+- **Request Tracking**: Unique request IDs for tracing
 
 ## Contributing
 
-1. Create a feature branch
-2. Make your changes
-3. Run tests and linting
-4. Submit a pull request
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests and linting
+5. Submit a pull request
 
-For major changes, please open an issue first to discuss what you would like to change.
+## License
+
+Proprietary - All rights reserved

@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/v1", tags=["analyzer"])
 logger = get_logger(__name__)
 
 
-@router.post("/analyze", response_model=AnalysisResponse, dependencies=[Depends(require_session)])
+@router.post("/analyze", response_model=AnalysisResponse)
 async def analyze_website(
     request: AnalyzeRequest,
     analyzer: Annotated[WebsiteAnalyzerService, Depends(get_analyzer_service)],
