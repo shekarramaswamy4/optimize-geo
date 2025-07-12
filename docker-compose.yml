@@ -1,0 +1,81 @@
+services:
+  # PostgreSQL for local development and production
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=lumarank
+      - POSTGRES_PASSWORD=lumarank_password
+      - POSTGRES_DB=lumarank_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lumarank"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - ""  # Default profile (always runs)
+      - dev
+      - prod
+
+  # MongoDB for local development and production
+  mongo:
+    image: mongo:7-jammy
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=admin_password
+      - MONGO_INITDB_DATABASE=lumarank
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    restart: unless-stopped
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/lumarank --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - ""  # Default profile (always runs)
+      - dev
+      - prod
+
+  # Web application (only for production)
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DATABASE_URL=postgresql://lumarank:lumarank_password@postgres:5432/lumarank_db
+      - MONGO_URL=mongodb://admin:admin_password@mongo:27017/lumarank?authSource=admin
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - LOG_FORMAT=json
+      - WORKERS=4
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    profiles:
+      - ""  # Default profile (always runs)
+      - dev
+      - prod
+
+volumes:
+  postgres_data:
+  mongo_data:
