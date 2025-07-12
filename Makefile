@@ -65,13 +65,23 @@ prod-logs: ## View production logs
 	docker-compose --profile prod logs -f
 
 # Database commands
-db-up: ## Start PostgreSQL containers
+db-up: ## Start all database containers (PostgreSQL + MongoDB)
+	docker-compose up -d postgres mongo
+	@echo "Waiting for databases to be ready..."
+	@sleep 5
+
+db-down: ## Stop all database containers
+	docker-compose down postgres mongo
+
+postgres-up: ## Start only PostgreSQL
 	docker-compose up -d postgres
 	@echo "Waiting for PostgreSQL to be ready..."
 	@sleep 5
 
-db-down: ## Stop PostgreSQL containers
-	docker-compose down postgres
+mongo-up: ## Start only MongoDB
+	docker-compose up -d mongo
+	@echo "Waiting for MongoDB to be ready..."
+	@sleep 5
 
 db-migrate: ## Run database migrations
 	poetry run alembic upgrade head
@@ -86,12 +96,15 @@ db-reset: ## Reset database (drop all tables and re-run migrations)
 db-shell: ## Open PostgreSQL shell
 	docker-compose exec postgres psql -U lumarank -d lumarank_db
 
-db-test-up: ## Start test PostgreSQL container
-	docker-compose --profile test up -d postgres_test
-	@echo "Waiting for test PostgreSQL to be ready..."
+mongo-shell: ## Open MongoDB shell
+	docker-compose exec mongo mongosh -u admin -p admin_password --authenticationDatabase admin lumarank
+
+db-test-up: ## Start test database containers (PostgreSQL + MongoDB)
+	docker-compose --profile test up -d postgres_test mongo_test
+	@echo "Waiting for test databases to be ready..."
 	@sleep 5
 
-db-test-down: ## Stop test PostgreSQL container
+db-test-down: ## Stop test database containers
 	docker-compose --profile test down
 
 # Development shortcuts

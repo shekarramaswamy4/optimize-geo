@@ -25,6 +25,7 @@ from tests.fixtures.test_data import (
     SAMPLE_WEBSITE_HTML,
     SAMPLE_WEBSITE_TEXT,
 )
+from uuid import uuid4
 
 
 @pytest.fixture
@@ -143,6 +144,49 @@ def mock_openai_responses() -> dict[str, str]:
 
 
 @pytest.fixture
+def test_auth_headers() -> dict[str, str]:
+    """Create test authentication headers."""
+    return {
+        "x-email": "test@example.com",
+        "x-auth-id": "test_auth_123",
+        "x-entity-id": str(uuid4()),
+    }
+
+
+@pytest.fixture
+def mock_session_context():
+    """Create a mock session context for testing."""
+    from src.core.auth import SessionContext, UserContext, EntityContext, MembershipContext
+    
+    user_id = uuid4()
+    entity_id = uuid4()
+    
+    return SessionContext(
+        user=UserContext(
+            id=user_id,
+            email="test@example.com",
+            auth_id="test_auth_123",
+            first_name="Test",
+            last_name="User",
+            is_active=True,
+        ),
+        entity=EntityContext(
+            id=entity_id,
+            name="Test Organization",
+            is_active=True,
+        ),
+        membership=MembershipContext(
+            id=uuid4(),
+            user_id=user_id,
+            entity_id=entity_id,
+            role="member",
+            is_active=True,
+        ),
+        request_id="test_123",
+    )
+
+
+@pytest.fixture
 def mock_successful_analysis() -> dict[str, Any]:
     """Create a complete successful analysis response."""
     return {
@@ -189,7 +233,7 @@ def test_db_engine(test_database_url):
 def test_db_session(test_db_engine):
     """Create test database session."""
     from sqlalchemy.orm import sessionmaker
-    from src.models.database import Base
+    from src.database.postgres.models import Base
     
     # Create tables
     Base.metadata.create_all(bind=test_db_engine)

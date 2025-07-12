@@ -6,7 +6,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import QueuePool
 
-from src.db import get_connection, get_session, get_db, init_db, dispose_engine
+from src.database.postgres.connection import get_connection, get_session, get_db, init_db, dispose_engine
 
 
 class TestDatabaseConnectionPool:
@@ -15,7 +15,7 @@ class TestDatabaseConnectionPool:
     def test_engine_creation(self):
         """Test that engine is created with correct parameters."""
         # This test verifies the engine exists and has the right type
-        from src.db import engine
+        from src.database.postgres.connection import engine
         
         assert engine is not None
         assert isinstance(engine, Engine)
@@ -23,7 +23,7 @@ class TestDatabaseConnectionPool:
         # Verify pool class
         assert isinstance(engine.pool, QueuePool)
     
-    @patch('src.db.engine')
+    @patch('src.database.postgres.connection.engine')
     def test_get_connection_context_manager(self, mock_engine):
         """Test get_connection context manager."""
         # Setup mock connection
@@ -38,7 +38,7 @@ class TestDatabaseConnectionPool:
         mock_engine.connect.assert_called_once()
         mock_connection.close.assert_called_once()
     
-    @patch('src.db.engine')
+    @patch('src.database.postgres.connection.engine')
     def test_get_connection_exception_handling(self, mock_engine):
         """Test get_connection handles exceptions properly."""
         # Setup mock connection
@@ -53,7 +53,7 @@ class TestDatabaseConnectionPool:
         # Verify connection is still closed
         mock_connection.close.assert_called_once()
     
-    @patch('src.db.SessionLocal')
+    @patch('src.database.postgres.connection.SessionLocal')
     def test_get_session_context_manager(self, mock_session_local):
         """Test get_session context manager."""
         # Setup mock session
@@ -68,7 +68,7 @@ class TestDatabaseConnectionPool:
         mock_session_local.assert_called_once()
         mock_session.close.assert_called_once()
     
-    @patch('src.db.SessionLocal')
+    @patch('src.database.postgres.connection.SessionLocal')
     def test_get_session_exception_handling(self, mock_session_local):
         """Test get_session handles exceptions properly."""
         # Setup mock session
@@ -83,7 +83,7 @@ class TestDatabaseConnectionPool:
         # Verify session is still closed
         mock_session.close.assert_called_once()
     
-    @patch('src.db.SessionLocal')
+    @patch('src.database.postgres.connection.SessionLocal')
     def test_get_db_generator(self, mock_session_local):
         """Test get_db generator for FastAPI dependency."""
         # Setup mock session
@@ -103,7 +103,7 @@ class TestDatabaseConnectionPool:
         
         mock_session.close.assert_called_once()
     
-    @patch('src.db.SessionLocal')
+    @patch('src.database.postgres.connection.SessionLocal')
     def test_get_db_exception_handling(self, mock_session_local):
         """Test get_db handles exceptions during cleanup."""
         # Setup mock session
@@ -123,8 +123,8 @@ class TestDatabaseConnectionPool:
         # Verify session is closed even with exception
         mock_session.close.assert_called_once()
     
-    @patch('src.db.engine')
-    @patch('src.models.database.Base')
+    @patch('src.database.postgres.connection.engine')
+    @patch('src.database.postgres.models.Base')
     def test_init_db(self, mock_base, mock_engine):
         """Test database initialization."""
         # Setup mock metadata
@@ -137,7 +137,7 @@ class TestDatabaseConnectionPool:
         # Verify tables are created
         mock_metadata.create_all.assert_called_once_with(bind=mock_engine)
     
-    @patch('src.db.engine')
+    @patch('src.database.postgres.connection.engine')
     def test_dispose_engine(self, mock_engine):
         """Test engine disposal."""
         # Call dispose_engine

@@ -17,6 +17,8 @@ A production-grade SEO analyzer that extracts business information and measures 
 
 - **Framework**: FastAPI with Uvicorn
 - **AI**: OpenAI GPT-3.5/GPT-4
+- **Databases**: PostgreSQL + MongoDB
+- **Authentication**: Header-based with user context
 - **Package Management**: Poetry
 - **Logging**: Structlog with JSON formatting
 - **Validation**: Pydantic v2
@@ -128,19 +130,30 @@ docker run -p 8000:8000 -e OPENAI_API_KEY=$OPENAI_API_KEY lumarank
 ### Example API Usage
 
 ```bash
-# Full analysis
+# Full analysis (requires authentication)
 curl -X POST http://localhost:8000/api/v1/analyze \
   -H "Content-Type: application/json" \
+  -H "x-email: user@example.com" \
+  -H "x-auth-id: auth_123" \
   -d '{"website_url": "https://example.com"}'
 
-# Quick analysis
+# Quick analysis (requires authentication)
 curl -X POST http://localhost:8000/api/v1/analyze/quick \
   -H "Content-Type: application/json" \
+  -H "x-email: user@example.com" \
+  -H "x-auth-id: auth_123" \
   -d '{"website_url": "https://example.com", "company_name": "Example Corp"}'
 
-# Health check
+# Check authentication status
+curl http://localhost:8000/api/v1/auth/check \
+  -H "x-email: user@example.com" \
+  -H "x-auth-id: auth_123"
+
+# Health check (no auth required)
 curl http://localhost:8000/health
 ```
+
+See [API_AUTH.md](API_AUTH.md) for detailed authentication documentation.
 
 ## Development
 

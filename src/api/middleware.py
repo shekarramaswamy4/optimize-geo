@@ -17,8 +17,14 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         # Generate or extract request ID
         request_id = request.headers.get("X-Request-ID", f"req_{uuid.uuid4().hex[:12]}")
         
+        # Store request ID in request state
+        request.state.request_id = request_id
+        
         # Set request context for logging
         set_request_context(request_id=request_id)
+        
+        # Extract user info if available
+        user_email = request.headers.get("x-email")
         
         # Log request
         logger.info(
@@ -26,6 +32,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             method=request.method,
             path=request.url.path,
             client_host=request.client.host if request.client else None,
+            user_email=user_email,
         )
         
         # Process request

@@ -33,13 +33,26 @@ class Settings(BaseSettings):
     cors_allow_methods: list[str] = Field(default=["*"])
     cors_allow_headers: list[str] = Field(default=["*"])
     
-    # Database settings
+    # PostgreSQL settings
     database_url: str = Field(..., description="PostgreSQL database URL")
     database_pool_size: int = Field(default=10, description="Database connection pool size")
     database_max_overflow: int = Field(default=20, description="Maximum overflow connections")
     database_pool_timeout: int = Field(default=30, description="Pool timeout in seconds")
     database_pool_recycle: int = Field(default=3600, description="Recycle connections after N seconds")
     database_echo: bool = Field(default=False, description="Echo SQL queries (debug)")
+    
+    # MongoDB settings
+    mongo_url: str = Field(default="mongodb://localhost:27017", description="MongoDB connection URL")
+    mongo_database: str = Field(default="lumarank", description="MongoDB database name")
+    mongo_max_pool_size: int = Field(default=100, description="MongoDB max pool size")
+    mongo_min_pool_size: int = Field(default=10, description="MongoDB min pool size")
+    mongo_max_idle_time_ms: int = Field(default=45000, description="MongoDB max idle time in ms")
+    mongo_connect_timeout_ms: int = Field(default=10000, description="MongoDB connect timeout in ms")
+    mongo_server_selection_timeout_ms: int = Field(default=30000, description="MongoDB server selection timeout in ms")
+    
+    # WorkOS settings
+    workos_api_key: str = Field(default="", description="WorkOS API key")
+    workos_client_id: str = Field(default="", description="WorkOS client ID")
     
     # OpenAI settings
     openai_api_key: str = Field(..., description="OpenAI API key")

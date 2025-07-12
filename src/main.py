@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from prometheus_client import make_asgi_app
 
 from src.api.middleware import RateLimitMiddleware, RequestContextMiddleware
-from src.api.routers import analyzer, health
+from src.api.routers import analyzer, auth, health
 from src.config.settings import get_settings
 from src.core.exceptions import WebsiteAnalyzerError
 from src.models.schemas import ErrorResponse
@@ -75,6 +75,7 @@ def create_app() -> FastAPI:
     
     # Include routers
     app.include_router(health.router)
+    app.include_router(auth.router)
     app.include_router(analyzer.router)
     
     # Mount metrics endpoint if enabled

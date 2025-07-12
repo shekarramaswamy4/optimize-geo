@@ -5,6 +5,12 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 
+class BaseResponse(BaseModel):
+    """Base response model with common fields."""
+    success: bool = Field(default=True, description="Whether the request was successful")
+    error: Optional[str] = Field(None, description="Error message if request failed")
+
+
 class QuestionType(str, Enum):
     """Types of search questions."""
     COMPANY_SPECIFIC = "company_specific"

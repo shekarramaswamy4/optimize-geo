@@ -89,7 +89,7 @@ def get_db() -> Generator[Session, None, None]:
 def init_db() -> None:
     """Initialize database (useful for creating tables in development)."""
     # Import all models here to ensure they are registered with SQLAlchemy
-    from src.models.database import Base
+    from src.database.postgres.models import Base
     
     Base.metadata.create_all(bind=engine)
 

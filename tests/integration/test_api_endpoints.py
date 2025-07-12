@@ -2,7 +2,7 @@
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.main import app
 from src.api.dependencies import get_analyzer_service
@@ -83,8 +83,15 @@ app.dependency_overrides[get_analyzer_service] = get_mock_analyzer_service
 @pytest.fixture
 def test_client():
     """Create test client with overridden dependencies."""
+    # Ensure overrides are set before creating client
+    app.dependency_overrides[get_settings] = get_test_settings
+    app.dependency_overrides[get_analyzer_service] = get_mock_analyzer_service
+    
     with TestClient(app) as client:
         yield client
+    
+    # Clean up overrides after test
+    app.dependency_overrides.clear()
 
 
 class TestHealthEndpoints:
@@ -110,12 +117,28 @@ class TestHealthEndpoints:
 class TestAnalyzerEndpoints:
     """Test analyzer API endpoints."""
     
-    def test_analyze_endpoint_success(self, test_client):
+    @patch("src.api.routers.analyzer.WebsiteCrawlDataRepository")
+    def test_analyze_endpoint_success(self, mock_repo_class, test_client, test_auth_headers, mock_session_context):
         """Test successful website analysis."""
+        # Mock MongoDB repository instance
+        mock_repo = MagicMock()
+        mock_crawl_data = MagicMock()
+        mock_crawl_data.id = "123"
+        mock_repo.create.return_value = mock_crawl_data
+        mock_repo_class.return_value = mock_repo
+        
+        # Override session dependency
+        from src.api.auth import get_session_context
+        app.dependency_overrides[get_session_context] = lambda: mock_session_context
+        
         response = test_client.post(
             "/api/v1/analyze",
             json={"website_url": "https://example.com"},
+            headers=test_auth_headers,
         )
+        
+        # Clean up override
+        app.dependency_overrides.clear()
         
         assert response.status_code == 200
         data = response.json()
@@ -125,19 +148,42 @@ class TestAnalyzerEndpoints:
         assert "questions" in data
         assert "test_results" in data
     
-    def test_quick_analyze_endpoint(self, test_client):
+    @patch("src.api.routers.analyzer.WebsiteCrawlDataRepository")
+    def test_quick_analyze_endpoint(self, mock_repo_class, test_client, test_auth_headers, mock_session_context):
         """Test quick analysis endpoint."""
+        # Mock MongoDB repository instance
+        mock_repo = MagicMock()
+        mock_crawl_data = MagicMock()
+        mock_crawl_data.id = "123"
+        mock_repo.create.return_value = mock_crawl_data
+        mock_repo_class.return_value = mock_repo
+        
+        # Override session dependency
+        from src.api.auth import get_session_context
+        # Ensure the analyzer service is mocked
+        app.dependency_overrides[get_settings] = get_test_settings
+        app.dependency_overrides[get_analyzer_service] = get_mock_analyzer_service
+        app.dependency_overrides[get_session_context] = lambda: mock_session_context
+        
         response = test_client.post(
             "/api/v1/analyze/quick",
             json={"website_url": "https://example.com"},
+            headers=test_auth_headers,
         )
+        
+        # Clean up override but keep the analyzer service mock
+        del app.dependency_overrides[get_session_context]
         
         assert response.status_code == 200
         data = response.json()
         assert data["test_results"] is None
     
-    def test_test_questions_endpoint(self, test_client):
+    def test_test_questions_endpoint(self, test_client, test_auth_headers, mock_session_context):
         """Test the test-questions endpoint."""
+        # Override session dependency
+        from src.api.auth import get_session_context
+        app.dependency_overrides[get_session_context] = lambda: mock_session_context
+        
         response = test_client.post(
             "/api/v1/test-questions",
             json={
@@ -150,7 +196,11 @@ class TestAnalyzerEndpoints:
                     }
                 ],
             },
+            headers=test_auth_headers,
         )
+        
+        # Clean up override
+        app.dependency_overrides.clear()
         
         assert response.status_code == 200
         data = response.json()
@@ -158,23 +208,39 @@ class TestAnalyzerEndpoints:
         assert data["success_rate"] == 0.85
         assert data["metadata"]["test_only"] is True
     
-    def test_invalid_url_validation(self, test_client):
+    def test_invalid_url_validation(self, test_client, test_auth_headers, mock_session_context):
         """Test validation error for invalid URL."""
+        # Override session dependency
+        from src.api.auth import get_session_context
+        app.dependency_overrides[get_session_context] = lambda: mock_session_context
+        
         response = test_client.post(
             "/api/v1/analyze",
             json={"website_url": "not-a-url"},
+            headers=test_auth_headers,
         )
+        
+        # Clean up override
+        app.dependency_overrides.clear()
         
         assert response.status_code == 422
         data = response.json()
         assert "detail" in data
     
-    def test_missing_required_fields(self, test_client):
+    def test_missing_required_fields(self, test_client, test_auth_headers, mock_session_context):
         """Test validation error for missing fields."""
+        # Override session dependency
+        from src.api.auth import get_session_context
+        app.dependency_overrides[get_session_context] = lambda: mock_session_context
+        
         response = test_client.post(
             "/api/v1/analyze",
             json={},
+            headers=test_auth_headers,
         )
+        
+        # Clean up override
+        app.dependency_overrides.clear()
         
         assert response.status_code == 422
         data = response.json()

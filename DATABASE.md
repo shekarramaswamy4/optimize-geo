@@ -1,26 +1,42 @@
-# PostgreSQL Database Setup
+# Database Setup (PostgreSQL + MongoDB)
 
-This document describes the PostgreSQL integration for the LumaRank project.
+This document describes the database architecture for the LumaRank project.
 
 ## Architecture
 
+### PostgreSQL
 - **SQLAlchemy 2.0** for ORM and connection pooling
 - **Alembic** for database migrations using raw SQL files
-- **PostgreSQL 16** as the database engine
+- **PostgreSQL 16** for relational data (users, entities, memberships)
+
+### MongoDB
+- **PyMongo** for database operations
+- **MongoDB 7** for document storage (website crawl data)
+- **Repository pattern** for clean data access
+
+### Infrastructure
 - **Single docker-compose.yml** with profiles for different environments
+- **Production-grade connection pooling** for both databases
+- **Health checks** and monitoring support
 
 ## Quick Start
 
-### 1. Start PostgreSQL
+### 1. Start Databases
 
 ```bash
-# For local development (just PostgreSQL)
+# For local development (PostgreSQL + MongoDB)
 make db-up
 
-# For production (web + PostgreSQL)
+# Start only PostgreSQL
+make postgres-up
+
+# Start only MongoDB
+make mongo-up
+
+# For production (web + databases)
 make prod-up
 
-# Verify it's running
+# Verify they're running
 docker ps
 ```
 
@@ -47,25 +63,55 @@ make db-shell
 \d users
 ```
 
-## Database Models
+## Data Models
 
-### Users Table
+### PostgreSQL Tables
+
+#### Users Table
 - `id` (UUID, primary key)
 - `email` (unique)
 - `first_name`, `last_name`
 - `workos_user_id` (for SSO integration)
 - Full audit columns
 
-### Entity Table
+#### Entity Table
 - `id` (UUID, primary key)
 - `name`
 - Full audit columns
 
-### User Membership Table
+#### User Membership Table
 - Links users to entities
 - `role` field (default: "member")
 - Cascade delete on user/entity removal
 - Unique constraint on (user_id, entity_id)
+
+### MongoDB Collections
+
+#### website_crawl_data
+- Website analysis and crawl results
+- SEO scoring and test results
+- Full-text search capabilities
+- Document schema:
+  ```javascript
+  {
+    _id: ObjectId,
+    website_url: "https://example.com",
+    domain: "example.com",
+    company_name: "Example Corp",
+    crawl_status: "completed",
+    crawl_started_at: ISODate(),
+    crawl_completed_at: ISODate(),
+    crawl_duration_seconds: 5.5,
+    page_title: "Example Page",
+    meta_description: "...",
+    company_info: { /* extracted data */ },
+    generated_questions: { /* SEO questions */ },
+    test_results: [ /* question test results */ ],
+    seo_score: 0.85,
+    created_at: ISODate(),
+    updated_at: ISODate()
+  }
+  ```
 
 ## Docker Compose Profiles
 
@@ -80,20 +126,23 @@ The single `docker-compose.yml` uses profiles to manage different environments:
 
 ```bash
 # Local development
-make db-up          # Start PostgreSQL
-make db-down        # Stop PostgreSQL
-make db-migrate     # Run migrations
+make db-up          # Start all databases
+make db-down        # Stop all databases
+make postgres-up    # Start only PostgreSQL
+make mongo-up       # Start only MongoDB
+make db-migrate     # Run PostgreSQL migrations
 make db-rollback    # Rollback last migration
-make db-reset       # Reset database
-make db-shell       # Open psql
+make db-reset       # Reset PostgreSQL database
+make db-shell       # Open PostgreSQL shell
+make mongo-shell    # Open MongoDB shell
 
 # Testing
-make db-test-up     # Start test database
-make db-test-down   # Stop test database
+make db-test-up     # Start test databases
+make db-test-down   # Stop test databases
 make test-unit      # Run unit tests
 
 # Production
-make prod-up        # Start web + PostgreSQL
+make prod-up        # Start web + databases
 make prod-down      # Stop production stack
 make prod-logs      # View production logs
 ```
@@ -122,24 +171,78 @@ with get_session() as session:
 ```python
 from fastapi import Depends
 from sqlalchemy.orm import Session
-from src.db import get_db
-from src.models.database import User
+from src.database import get_postgres_db, User
 
 @app.get("/users")
-def get_users(db: Session = Depends(get_db)):
+def get_users(db: Session = Depends(get_postgres_db)):
     return db.query(User).all()
+```
+
+### MongoDB Usage
+
+#### Using Repository Pattern
+```python
+from src.database import WebsiteCrawlDataRepository, WebsiteCrawlDataCreate
+
+# Create repository
+repo = WebsiteCrawlDataRepository()
+
+# Create new crawl data
+crawl_data = await repo.create(WebsiteCrawlDataCreate(
+    website_url="https://example.com",
+    company_name="Example Corp"
+))
+
+# Get by URL
+crawl_data = await repo.get_by_url("https://example.com")
+
+# List with filters
+crawl_list = await repo.list(
+    status=CrawlStatus.COMPLETED,
+    limit=50
+)
+
+# Search
+search_results = await repo.search("example company")
+
+# Get statistics
+stats = await repo.get_statistics()
+```
+
+#### Direct MongoDB Access
+```python
+from src.database import get_mongo_collection, Collections
+
+# Get collection
+collection = get_mongo_collection(Collections.WEBSITE_CRAWL_DATA)
+
+# Insert document
+result = collection.insert_one({
+    "website_url": "https://example.com",
+    "crawl_status": "pending"
+})
+
+# Find documents
+docs = collection.find({"crawl_status": "completed"})
 ```
 
 ## Configuration
 
 Database settings in `.env`:
 ```env
+# PostgreSQL
 DATABASE_URL=postgresql://lumarank:lumarank_password@localhost:5432/lumarank_db
 DATABASE_POOL_SIZE=10
 DATABASE_MAX_OVERFLOW=20
 DATABASE_POOL_TIMEOUT=30
 DATABASE_POOL_RECYCLE=3600
 DATABASE_ECHO=false
+
+# MongoDB
+MONGO_URL=mongodb://admin:admin_password@localhost:27017/lumarank?authSource=admin
+MONGO_DATABASE=lumarank
+MONGO_MAX_POOL_SIZE=100
+MONGO_MIN_POOL_SIZE=10
 ```
 
 ## Migrations

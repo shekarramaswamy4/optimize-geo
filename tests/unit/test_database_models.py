@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.models.database import Base, User, Entity, UserMembership
+from src.database.postgres.models import Base, User, Entity, UserMembership
 
 
 @pytest.fixture
