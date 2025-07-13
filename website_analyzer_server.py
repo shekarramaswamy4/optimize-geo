@@ -77,139 +77,6 @@ def analyze_website():
         }), 500
 
 
-@app.route('/analyze/quick', methods=['POST'])
-def analyze_website_quick():
-    """
-    Quick analysis endpoint that skips question testing for faster results
-    
-    Request body:
-    {
-        "website_url": "https://example.com",
-        "company_name": "Optional Company Name"
-    }
-    
-    Returns:
-    {
-        "success": true,
-        "website_url": "https://example.com", 
-        "company_name": "Example",
-        "analysis": {...},
-        "questions": {...}
-    }
-    """
-    try:
-        # Get request data
-        data = request.get_json()
-        
-        if not data or 'website_url' not in data:
-            return jsonify({
-                "success": False,
-                "error": "Missing 'website_url' in request body"
-            }), 400
-        
-        website_url = data['website_url']
-        company_name = data.get('company_name')
-        
-        # Validate URL
-        if not website_url.startswith(('http://', 'https://')):
-            website_url = 'https://' + website_url
-        
-        # Check for OpenAI API key
-        api_key = os.getenv('OPENAI_API_KEY')
-        if not api_key:
-            return jsonify({
-                "success": False,
-                "error": "OpenAI API key not configured on server"
-            }), 500
-        
-        # Create analyzer instance
-        analyzer = WebsiteAnalyzer(api_key)
-        
-        # Extract company name from URL if not provided
-        if not company_name:
-            company_name = analyzer.extract_company_name_from_url(website_url)
-        
-        # Fetch and analyze content
-        content = analyzer.fetch_website_content(website_url)
-        analysis = analyzer.analyze_website_content(content)
-        
-        # Generate questions only (no testing)
-        questions = analyzer.generate_search_questions(analysis, company_name)
-        
-        return jsonify({
-            "success": True,
-            "website_url": website_url,
-            "company_name": company_name,
-            "analysis": analysis,
-            "questions": questions
-        })
-        
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-
-
-@app.route('/test-questions', methods=['POST'])
-def test_questions():
-    """
-    Test questions against OpenAI and return scoring results
-    
-    Request body:
-    {
-        "questions": {
-            "company_specific_questions": [...],
-            "problem_based_questions": [...]
-        },
-        "company_name": "Company Name"
-    }
-    
-    Returns:
-    {
-        "success": true,
-        "scoring_results": {...}
-    }
-    """
-    try:
-        # Get request data
-        data = request.get_json()
-        
-        if not data or 'questions' not in data or 'company_name' not in data:
-            return jsonify({
-                "success": False,
-                "error": "Missing 'questions' or 'company_name' in request body"
-            }), 400
-        
-        questions = data['questions']
-        company_name = data['company_name']
-        
-        # Check for OpenAI API key
-        api_key = os.getenv('OPENAI_API_KEY')
-        if not api_key:
-            return jsonify({
-                "success": False,
-                "error": "OpenAI API key not configured on server"
-            }), 500
-        
-        # Create analyzer instance
-        analyzer = WebsiteAnalyzer(api_key)
-        
-        # Test questions and get scoring results
-        scoring_results = analyzer.test_questions_with_scoring(questions, company_name)
-        
-        return jsonify({
-            "success": True,
-            "scoring_results": scoring_results
-        })
-        
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
-
-
 @app.route('/health', methods=['GET'])
 def health_check():
     """
@@ -298,7 +165,7 @@ def internal_error(error):
 
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 4000))
     debug = os.environ.get('DEBUG', 'False').lower() == 'true'
     
     print(f"Starting Website Analyzer Server on port {port}")
