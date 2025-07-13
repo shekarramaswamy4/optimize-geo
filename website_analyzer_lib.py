@@ -7,6 +7,8 @@ import requests
 from bs4 import BeautifulSoup
 import openai
 import json
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Any, Optional
 from urllib.parse import urlparse
 
@@ -95,7 +97,7 @@ class WebsiteAnalyzer:
         4. Features: What are the listed features of the product/service?
         5. Pricing: What is the pricing for the product, if any can be found?
 
-        Please structure your response as a JSON object with the keys: "company_description", "ideal_customer_profile", "validation_traction", "features", "pricing". ONLY return valid json, do not include any additional text or explanations. The outout must be a valid JSON object with the specified keys.
+        Please structure your response as a JSON object with the keys: "company_description", "ideal_customer_profile", "validation_traction", "features", "pricing". ONLY return valid json, do not include any additional text or explanations. The outout must be a valid JSON object with the specified keys. Each key should have at most 2-3 sentences, except for the "company_description" which can be a bit longer.
         """
         
         try:
@@ -105,11 +107,12 @@ class WebsiteAnalyzer:
                     {"role": "system", "content": "You are a business analyst expert at analyzing companies and their offerings. Provide detailed but concise analysis."},
                     {"role": "user", "content": prompt}
                 ],
-                max_completion_tokens=1500,
+                max_completion_tokens=2000,
                 response_format={"type": "json_object"}
             )
             
             # Try to parse as JSON, fallback to plain text if it fails
+            print("OpenAI response for analysis", response)
             try:
                 analysis = json.loads(response.choices[0].message.content)
             except json.JSONDecodeError:
@@ -262,7 +265,7 @@ class WebsiteAnalyzer:
     
     def test_questions_with_scoring(self, questions: Dict[str, Any], company_name: str) -> Dict[str, Any]:
         """
-        Test all generated questions with OpenAI and score the responses
+        Test all generated questions with OpenAI and score the responses using parallel execution
         
         Args:
             questions: Dictionary containing generated questions
@@ -280,35 +283,68 @@ class WebsiteAnalyzer:
             "max_possible_score": 0
         }
         
-        # Test company-specific questions
         company_questions = questions.get('company_specific_questions', [])
-        for question in company_questions:
-            response = self.query_openai_with_question(question, False)
-            answer = response.get("answer", "")
-            score = response.get("score", 0)
+        problem_questions = questions.get('problem_based_questions', [])
+        
+        # Use ThreadPoolExecutor to parallelize API calls
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            # Submit all company-specific questions
+            company_futures = [
+                executor.submit(self.query_openai_with_question, question, False)
+                for question in company_questions
+            ]
             
-            results["company_specific_results"].append({
-                "question": question,
-                "response": answer,
-                "score": score,
-            })
-            results["company_specific_score"] += score
+            # Submit all problem-based questions  
+            problem_futures = [
+                executor.submit(self.query_openai_with_question, question, True)
+                for question in problem_questions
+            ]
+            
+            # Process company-specific results
+            for i, future in enumerate(company_futures):
+                try:
+                    response = future.result()
+                    answer = response.get("answer", "")
+                    score = response.get("score", 0)
+                    
+                    results["company_specific_results"].append({
+                        "question": company_questions[i],
+                        "response": answer,
+                        "score": score,
+                    })
+                    results["company_specific_score"] += score
+                except Exception as e:
+                    print(f"Error processing company question '{company_questions[i]}': {e}")
+                    results["company_specific_results"].append({
+                        "question": company_questions[i],
+                        "response": f"Error: {e}",
+                        "score": 0,
+                    })
+            
+            # Process problem-based results
+            for i, future in enumerate(problem_futures):
+                try:
+                    response = future.result()
+                    answer = response.get("answer", "")
+                    score = self.score_problem_based_response(answer, company_name)
+                    
+                    results["problem_based_results"].append({
+                        "question": problem_questions[i],
+                        "response": answer,
+                        "score": score,
+                    })
+                    results["problem_based_score"] += score
+                except Exception as e:
+                    print(f"Error processing problem question '{problem_questions[i]}': {e}")
+                    results["problem_based_results"].append({
+                        "question": problem_questions[i],
+                        "response": f"Error: {e}",
+                        "score": 0,
+                    })
         
         print("Company specific results", results["company_specific_results"])
-        # Test problem-based questions
-        problem_questions = questions.get('problem_based_questions', [])
-        for question in problem_questions:
-            response = self.query_openai_with_question(question, True)
-            score = self.score_problem_based_response(response.get("answer", ""), company_name)
-            
-            results["problem_based_results"].append({
-                "question": question,
-                "response": response.get("answer", ""),
-                "score": score,
-            })
-            results["problem_based_score"] += score
-        
         print("Problem based results", results["problem_based_results"])
+        
         # Calculate totals
         results["total_score"] = results["company_specific_score"] + results["problem_based_score"]
         results["max_possible_score"] = len(company_questions) * 2 + len(problem_questions) * 2
