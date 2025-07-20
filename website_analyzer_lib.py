@@ -196,14 +196,16 @@ class WebsiteAnalyzer:
             extra_problem_text = "If possible, also suggest the top companies/products that solve the pain point described in the question. Your goal is to help the asker find the best solution to the problem."
 
         prompt = f"""
-        Answer the following question about a company: {question}. In addition, score your response based on whether you think a prospective customer for the company would find it helpful. 
+        You have two tasks: 
+        1. Answer the question about a company based on the information you have. Here is the question: {question}. In your answer, you should provide a direct response to the question, and if possible, include relevant details about the company. You ARE NEVER ALLOWED TO MAKE UP INFORMATION. If you do not have enough information to answer the question, you should say "I don't know" or "I don't have enough information to answer that question." Where possible, cite your sources or provide links to the information you used to answer the question.
+        2. Score your response based on whether you think a prospective customer for the company would find your answer helpful. {extra_problem_text}
 
-        Structure your response as JSON, with two keys: "answer", and "score". The "answer" should be the response to the question. {extra_problem_text}
-        
         The "score" should be an integer from 0-2 indicating the helpfulness of the answer and how *it directly answers the question*. If there is no information in the answer that directly answers the question, return a score of 0.
         0 - Poor quality, not helpful
         1 - Moderate quality, somewhat helpful
         2 - High quality, very helpful
+
+        Structure your response as JSON, with two keys: "answer", and "score". The "answer" should be the response to the question.
         """
 
         try:
@@ -385,6 +387,7 @@ class WebsiteAnalyzer:
         # Generate questions
         questions = self.generate_search_questions(analysis, company_name)
         
+        questions["company_specific_questions"] = [f"""What is {company_name}'s feature set and what problems does it solve?""", f"""Are there any reviews or case studies for {company_name}? If so, how did {company_name} help the customer?""", f"""Has {company_name} been written about in any articles or blogs? If so, which ones and what do they say?"""]
         print("Generated questions", questions)
         # Test questions and score responses
         if "raw_questions" not in questions:
