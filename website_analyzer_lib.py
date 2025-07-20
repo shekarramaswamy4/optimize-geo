@@ -400,7 +400,8 @@ class WebsiteAnalyzer:
             "company_name": company_name,
             "analysis": analysis,
             "questions": questions,
-            "scoring_results": scoring_results
+            "scoring_results": scoring_results,
+            "suggestions": ["Add an llms.txt file"]
         }
     
     @staticmethod
