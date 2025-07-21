@@ -60,7 +60,8 @@ def analyze_website():
             }), 500
         
         # Create analyzer instance
-        analyzer = WebsiteAnalyzer(api_key)
+        # Add serperapikey, newsapikey, tavily apikey
+        analyzer = WebsiteAnalyzer(api_key, "6aca534ee89f594b9aff0814b5a745dae5abdb86", "4897d5b31a2f40919ed63eab6c09469f", "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")
         
         # Run complete analysis
         results = analyzer.analyze_website_complete(website_url, company_name)
