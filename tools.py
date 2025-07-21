@@ -197,7 +197,7 @@ class TavilyTool(Tool):
                         },
                         "max_results": {
                             "type": "integer",
-                            "description": "Maximum number of results to return (default: 5)"
+                            "description": "Maximum number of results to return (default: 10)"
                         },
                         "include_answer": {
                             "type": "boolean",

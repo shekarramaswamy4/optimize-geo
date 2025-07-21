@@ -212,7 +212,7 @@ class WebsiteAnalyzer:
 
         extra_problem_text = ""
         if is_problem_question:
-            extra_problem_text = "If possible, also suggest the top companies/products that solve the pain point described in the question. Your goal is to help the asker find the best solution to the problem."
+            extra_problem_text = "- In addition, You MUST suggest 2 or 3 companies/products that solve the pain point described in the question."
 
         system_prompt = f"""
         You are a helpful assistant that answers questions about companies and products. 
@@ -225,13 +225,12 @@ class WebsiteAnalyzer:
         
         You have two tasks:
         1. Answer the question: {question}
-           - Provide a direct response with relevant details
+           - Provide a direct response with relevant details. You should respond with 4-5 sentences maximum.
+           {extra_problem_text}
         2. Score your response (0-2) based on helpfulness to a prospective customer
            - 0: Poor quality, not helpful
            - 1: Moderate quality, somewhat helpful  
            - 2: High quality, very helpful
-        
-        {extra_problem_text}
         
         IMPORTANT: Never make up information. If you don't have enough information, say so.
         Structure your response as JSON with keys: "answer" and "score".
@@ -467,7 +466,8 @@ class WebsiteAnalyzer:
         # Generate questions
         questions = self.generate_search_questions(analysis, company_name)
         
-        questions["company_specific_questions"] = [f"""What is {company_name}'s feature set and what problems does it solve?""", f"""Are there any reviews or case studies for {company_name}? If so, how did {company_name} help the customer?""", f"""Has {company_name} or {company_name}'s founder been written about in any articles or blogs? If so, which ones and what do they say?"""]
+        # TODO(now) - can ask questions about traction/funding
+        questions["company_specific_questions"] = [f"""What is {company_name}'s feature set and what problems does it solve?""", f"""Are there any reviews or case studies for {company_name}? If so, how did {company_name} help the customer and provide links to that content.""", f"""Has {company_name} or {company_name}'s founder been written about in any articles or blogs? If so, which ones and what do they say?"""]
         print("Generated questions", questions)
         # Test questions and score responses
         if "raw_questions" not in questions:
