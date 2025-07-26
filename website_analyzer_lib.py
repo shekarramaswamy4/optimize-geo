@@ -117,7 +117,7 @@ class WebsiteAnalyzer:
 
         Please structure your response as a JSON object with the keys: "company_description", "ideal_customer_profile", "validation_traction", "features", "pricing". ONLY return valid json, do not include any additional text or explanations. The outout must be a valid JSON object with the specified keys. Each key should have at most 2-3 sentences, except for the "company_description" which can be a bit longer.
         """
-        
+
         try:
             response = self.client.chat.completions.create(
                 model=model,
@@ -130,7 +130,6 @@ class WebsiteAnalyzer:
             )
             
             # Try to parse as JSON, fallback to plain text if it fails
-            print("OpenAI response for analysis", response)
             try:
                 analysis = json.loads(response.choices[0].message.content)
             except json.JSONDecodeError:
@@ -198,7 +197,7 @@ class WebsiteAnalyzer:
         except Exception as e:
             raise Exception(f"Error generating questions with OpenAI: {e}")
     
-    def query_openai_with_question(self, question: str, is_problem_question: bool) -> Dict[str, Any]:
+    def query_openai_with_question(self, company_name: str, question: str, is_problem_question: bool) -> Dict[str, Any]:
         """
         Query OpenAI with a fresh context using the provided question, with optional tool calling
         
@@ -212,7 +211,21 @@ class WebsiteAnalyzer:
 
         extra_problem_text = ""
         if is_problem_question:
-            extra_problem_text = "- In addition, You MUST suggest 2 or 3 companies/products that solve the pain point described in the question."
+            extra_problem_text = "- In addition, You MUST suggest 2 or 3 companies/products that solve the pain point described in the question. Try to highlight smaller startups or lesser-known companies that might not be in the mainstream. Do not suggest well-known companies like Google, Microsoft, etc. Focus on innovative solutions that are not widely recognized."
+        
+        scoring_rules = """
+2. Score your response (0-2) based on helpfulness to a prospective customer
+    - 0: Poor quality, not helpful
+    - 1: Moderate quality, somewhat helpful  
+    - 2: High quality, very helpful
+"""
+        if is_problem_question:
+            scoring_rules = """
+2. Score your response (0-2) based on whether the company {company_name} is mentioned in the response. Remember, sometimes the answer may contain a shortened/abbreviated version of the company name, so you should check for that as well. For example, if the company website is "https://trylumarank.com", you should check for "LumaRank" in the response. Make sure to not be case sensitive.
+    - 0: Company not mentioned at all
+    - 1: Company mentioned somewhere in the response. You can ONLY give a score of 1 if the company {company_name} is mentioned in the response. There is a heavy penalty for giving a score of 1 if the company is not mentioned in the response.
+    - 2: Company mentioned as the first solution in the response. You can ONLY give a score of 2 if the company {company_name} is mentioned as the first solution in the response. There is a heavy penalty for giving a score of 2 if the company is not mentioned as the first solution in the response.
+"""
 
         system_prompt = f"""
         You are a helpful assistant that answers questions about companies and products. 
@@ -227,11 +240,8 @@ class WebsiteAnalyzer:
         1. Answer the question: {question}
            - Provide a direct response with relevant details. You should respond with 4-5 sentences maximum.
            {extra_problem_text}
-        2. Score your response (0-2) based on helpfulness to a prospective customer
-           - 0: Poor quality, not helpful
-           - 1: Moderate quality, somewhat helpful  
-           - 2: High quality, very helpful
-        
+        {scoring_rules}
+                
         IMPORTANT: Never make up information. If you don't have enough information, say so.
         Structure your response as JSON with keys: "answer" and "score".
         """
@@ -244,7 +254,6 @@ class WebsiteAnalyzer:
             
             # Get tool definitions if tools are available
             tools = self.tool_manager.get_function_definitions() if self.tool_manager.tools else None
-            print(tools)
             
             response = self.client.chat.completions.create(
                 model=model,
@@ -254,7 +263,7 @@ class WebsiteAnalyzer:
                 response_format={"type": "json_object"} if not tools else None
             )
             
-            print("init response", response)
+            print("OpenAI init response to question", company_name, question, response)
             # Handle tool calls
             if response.choices[0].message.tool_calls:
                 tool_calls = response.choices[0].message.tool_calls
@@ -297,7 +306,7 @@ class WebsiteAnalyzer:
                 
                 response = final_response
             
-            print("OpenAI response", question, response)
+            print("OpenAI final response for question", company_name, question, response)
             print()
             
             try:
@@ -309,42 +318,6 @@ class WebsiteAnalyzer:
             
         except Exception as e:
             return {"error": f"Error querying OpenAI: {e}", "answer": "", "score": 0}
-    
-    def score_problem_based_response(self, response: Dict[str, Any], company_name: str) -> int:
-        """
-        Score problem-based question responses:
-        0 - Company not mentioned at all
-        1 - Company mentioned
-        2 - Company is the first company mentioned
-        
-        Args:
-            response: OpenAI response to score
-            company_name: Name of the company to look for
-            
-        Returns:
-            Score from 0-2
-        """
-        if not response or "Error" in response:
-            return 0
-        
-        response_lower = response.lower()
-        company_lower = company_name.lower()
-        
-        if company_lower not in response_lower:
-            return 0
-        
-        # Find first company mention (look for patterns like "Company X", "X is", "X offers", etc.)
-        words = response.split()
-        for i, word in enumerate(words):
-            # Check if this word might be a company name (capitalized, not common words)
-            if (word[0].isupper() and len(word) > 2 and 
-                word not in ['The', 'This', 'That', 'These', 'Those', 'A', 'An', 'And', 'But', 'Or', 'For', 'So', 'Yet']):
-                if word.lower() == company_lower:
-                    return 2  # First company mentioned
-                elif any(common in word.lower() for common in ['inc', 'corp', 'ltd', 'llc', 'co']):
-                    return 1  # Another company mentioned first
-        
-        return 1  # Company mentioned but not first
     
     def test_questions_with_scoring(self, questions: Dict[str, Any], company_name: str) -> Dict[str, Any]:
         """
@@ -373,13 +346,13 @@ class WebsiteAnalyzer:
         with ThreadPoolExecutor(max_workers=10) as executor:
             # Submit all company-specific questions
             company_futures = [
-                executor.submit(self.query_openai_with_question, question, False)
+                executor.submit(self.query_openai_with_question, company_name, question, False)
                 for question in company_questions
             ]
             
             # Submit all problem-based questions  
             problem_futures = [
-                executor.submit(self.query_openai_with_question, question, True)
+                executor.submit(self.query_openai_with_question, company_name, question, True)
                 for question in problem_questions
             ]
             
@@ -409,7 +382,7 @@ class WebsiteAnalyzer:
                 try:
                     response = future.result()
                     answer = response.get("answer", "")
-                    score = self.score_problem_based_response(answer, company_name)
+                    score = response.get("score", 0)
                     
                     results["problem_based_results"].append({
                         "question": problem_questions[i],
@@ -459,14 +432,15 @@ class WebsiteAnalyzer:
         
         # Fetch website content
         content = self.fetch_website_content(website_url)
+        print("Fetched website content", content[:200], "...") 
         
         # Analyze content
         analysis = self.analyze_website_content(content)
+        print("Analyzed website content", analysis)
         
         # Generate questions
         questions = self.generate_search_questions(analysis, company_name)
         
-        # TODO(now) - can ask questions about traction/funding
         questions["company_specific_questions"] = [f"""What is {company_name}'s feature set and what problems does it solve?""", f"""Are there any reviews or case studies for {company_name}? If so, how did {company_name} help the customer and provide links to that content.""", f"""Has {company_name} or {company_name}'s founder been written about in any articles or blogs? If so, which ones and what do they say?"""]
         print("Generated questions", questions)
         # Test questions and score responses
