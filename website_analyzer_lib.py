@@ -223,7 +223,7 @@ class WebsiteAnalyzer:
 """
         if is_problem_question:
             scoring_rules = """
-2. Score your response (0-2) based on whether the company {company_name} is mentioned in the response. Remember, sometimes the answer may contain a shortened or moeified version of the company name, so you should check for that as well. For example, if the company name is trylumarank, you should check for LumaRank in the response, since verbs like "use" or "try" are common prefixes. Make sure to be case insensitive in your checks as well.
+2. Score your response (0-2) based on whether the company {company_name} is mentioned in the response. Remember, sometimes the answer may contain a shortened or moeified version of the company name, so you should check for that as well. For example, if the company name is "try[COMPANY]" or "use[COMPANY]", you should check for [COMPANY] in the response, since verbs like "use" or "try" are common prefixes. Make sure to be case insensitive in your checks as well.
     - 0: Company not mentioned at all
     - 1: Company mentioned somewhere in the response. You can ONLY give a score of 1 if the company {company_name} is mentioned in the response. There is a heavy penalty for giving a score of 1 if the company is not mentioned in the response.
     - 2: Company mentioned as the first solution in the response. You can ONLY give a score of 2 if the company {company_name} is mentioned as the first solution in the response. There is a heavy penalty for giving a score of 2 if the company is not mentioned as the first solution in the response.
@@ -243,7 +243,7 @@ class WebsiteAnalyzer:
            - Provide a direct response with relevant details. You should respond with 4-5 sentences maximum.
            {extra_problem_text}
         {scoring_rules}
-        3. If the score is 0, provide a specific suggestion for improvement that would help LLMs and other AI tools better understand how to answer the question. For example, if the question is "What is the feature set of LumaRank?", you might suggest "Add a features page to your website that lists all the features of LumaRank in detail." If the question is "What is LumaRank's pricing?", you might suggest "Add a pricing page to your website that lists all the pricing plans for LumaRank in detail." If the score is 1 or 2, you can simply return an empty string for the suggestion. The suggestion should be a single sentence that is actionable and specific to the question.
+        3. If the score is 0, provide a specific suggestion for improvement that would help LLMs and other AI tools better understand how to answer the question. For example, if the question is "What is the feature set of [COMPANY]?", you might suggest "Add a features page to your website that lists all the features of [COMPANY] in detail." If the question is "What is [COMPANY]'s pricing?", you might suggest "Add a pricing page to your website that lists all the pricing plans for [COMPANY] in detail." If the score is 1 or 2, you can simply return an empty string for the suggestion. The suggestion should be a single sentence that is actionable and specific to the question.
                 
         IMPORTANT: Never make up information. If you don't have enough information, say so.
         Structure your response as JSON with keys: "answer", "score", "suggestion".
