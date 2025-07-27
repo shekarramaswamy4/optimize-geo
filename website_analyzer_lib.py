@@ -3,6 +3,7 @@ Website Analyzer Library
 Shared library for analyzing websites and generating customer search questions with scoring
 """
 
+import random
 import requests
 from bs4 import BeautifulSoup
 import openai
@@ -208,6 +209,7 @@ class WebsiteAnalyzer:
         Returns:
             OpenAI response with answer and score
         """
+        random_number = random.randint(1, 10000)
 
         extra_problem_text = ""
         if is_problem_question:
@@ -221,7 +223,7 @@ class WebsiteAnalyzer:
 """
         if is_problem_question:
             scoring_rules = """
-2. Score your response (0-2) based on whether the company {company_name} is mentioned in the response. Remember, sometimes the answer may contain a shortened/abbreviated version of the company name, so you should check for that as well. For example, if the company website is "https://trylumarank.com", you should check for "LumaRank" in the response. Make sure to not be case sensitive.
+2. Score your response (0-2) based on whether the company {company_name} is mentioned in the response. Remember, sometimes the answer may contain a shortened or moeified version of the company name, so you should check for that as well. For example, if the company name is trylumarank, you should check for LumaRank in the response, since verbs like "use" or "try" are common prefixes. Make sure to be case insensitive in your checks as well.
     - 0: Company not mentioned at all
     - 1: Company mentioned somewhere in the response. You can ONLY give a score of 1 if the company {company_name} is mentioned in the response. There is a heavy penalty for giving a score of 1 if the company is not mentioned in the response.
     - 2: Company mentioned as the first solution in the response. You can ONLY give a score of 2 if the company {company_name} is mentioned as the first solution in the response. There is a heavy penalty for giving a score of 2 if the company is not mentioned as the first solution in the response.
@@ -236,14 +238,15 @@ class WebsiteAnalyzer:
         - web_search: For general web searches about companies, products, or topics
         - get_recent_news: For recent news articles about companies or topics
         
-        You have two tasks:
+        You have three tasks:
         1. Answer the question: {question}
            - Provide a direct response with relevant details. You should respond with 4-5 sentences maximum.
            {extra_problem_text}
         {scoring_rules}
+        3. If the score is 0, provide a specific suggestion for improvement that would help LLMs and other AI tools better understand how to answer the question. For example, if the question is "What is the feature set of LumaRank?", you might suggest "Add a features page to your website that lists all the features of LumaRank in detail." If the question is "What is LumaRank's pricing?", you might suggest "Add a pricing page to your website that lists all the pricing plans for LumaRank in detail." If the score is 1 or 2, you can simply return an empty string for the suggestion. The suggestion should be a single sentence that is actionable and specific to the question.
                 
         IMPORTANT: Never make up information. If you don't have enough information, say so.
-        Structure your response as JSON with keys: "answer" and "score".
+        Structure your response as JSON with keys: "answer", "score", "suggestion".
         """
 
         try:
@@ -259,11 +262,11 @@ class WebsiteAnalyzer:
                 model=model,
                 messages=messages,
                 tools=tools,
-                max_completion_tokens=1500,
+                max_completion_tokens=20000,
                 response_format={"type": "json_object"} if not tools else None
             )
             
-            print("OpenAI init response to question", company_name, question, response)
+            print(f"[{random_number}] OpenAI init response to question", company_name, question, response)
             # Handle tool calls
             if response.choices[0].message.tool_calls:
                 tool_calls = response.choices[0].message.tool_calls
@@ -284,10 +287,10 @@ class WebsiteAnalyzer:
                     except json.JSONDecodeError:
                         function_args = {}
                     
-                    print("Attempting tool call", function_name, function_args)
+                    print(f"[{random_number}] Attempting tool call", question, function_name, function_args)
                     # Execute the function
                     tool_result = self.tool_manager.execute_tool(function_name, function_args)
-                    print("Tool result", tool_result)
+                    print(f"[{random_number}] Tool result for question", question, tool_result)
                     
                     # Add tool result to conversation
                     messages.append({
@@ -306,7 +309,7 @@ class WebsiteAnalyzer:
                 
                 response = final_response
             
-            print("OpenAI final response for question", company_name, question, response)
+            print(f"[{random_number}] OpenAI final response for question", company_name, question, response)
             print()
             
             try:
@@ -362,11 +365,13 @@ class WebsiteAnalyzer:
                     response = future.result()
                     answer = response.get("answer", "")
                     score = response.get("score", 0)
+                    suggestion = response.get("suggestion", "")
                     
                     results["company_specific_results"].append({
                         "question": company_questions[i],
                         "response": answer,
                         "score": score,
+                        "suggestion": suggestion
                     })
                     results["company_specific_score"] += score
                 except Exception as e:
@@ -383,11 +388,13 @@ class WebsiteAnalyzer:
                     response = future.result()
                     answer = response.get("answer", "")
                     score = response.get("score", 0)
+                    suggestion = response.get("suggestion", "")
                     
                     results["problem_based_results"].append({
                         "question": problem_questions[i],
                         "response": answer,
                         "score": score,
+                        "suggestion": suggestion
                     })
                     results["problem_based_score"] += score
                 except Exception as e:
@@ -412,6 +419,46 @@ class WebsiteAnalyzer:
         
         return results
     
+    def check_llms_txt(self, website_url: str) -> Dict[str, Any]:
+        """
+        Check if the website has an llms.txt file and return its content
+        
+        Args:
+            website_url: Base website URL
+            
+        Returns:
+            Dictionary with 'found' boolean and 'content' string if found
+        """
+        try:
+            # Ensure the URL ends with a slash for proper joining
+            if not website_url.endswith('/'):
+                website_url += '/'
+            
+            llms_url = website_url + 'llms.txt'
+            
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            
+            response = requests.get(llms_url, headers=headers, timeout=10)
+            
+            if response.status_code == 200:
+                return {
+                    'found': True,
+                    'content': response.text.strip()
+                }
+            else:
+                return {
+                    'found': False,
+                    'content': None
+                }
+                
+        except Exception as e:
+            return {
+                'found': False,
+                'content': None
+            }
+    
     def analyze_website_complete(self, website_url: str, company_name: Optional[str] = None) -> Dict[str, Any]:
         """
         Complete website analysis workflow
@@ -434,6 +481,11 @@ class WebsiteAnalyzer:
         content = self.fetch_website_content(website_url)
         print("Fetched website content", content[:200], "...") 
         
+        # Check for llms.txt file
+        llms_txt_result = self.check_llms_txt(website_url)
+        if llms_txt_result['found']:
+            content = llms_txt_result['content']
+        
         # Analyze content
         analysis = self.analyze_website_content(content)
         print("Analyzed website content", analysis)
@@ -448,14 +500,30 @@ class WebsiteAnalyzer:
             scoring_results = self.test_questions_with_scoring(questions, company_name)
         else:
             scoring_results = {"error": "Could not parse generated questions"}
+            print("Error parsing generated questions", scoring_results, "for", website_url, company_name)
         
+        suggestions = []
+        if not llms_txt_result['found']:
+            suggestions.append("Add an llms.txt file for LLM discovery")
+        
+        for companyQuestion in scoring_results["company_specific_results"]:
+            if companyQuestion["score"] == 0 and "suggestion" in companyQuestion:
+                if companyQuestion["suggestion"] != "":
+                    suggestions.append(companyQuestion["suggestion"])
+        for problemQuestion in scoring_results["problem_based_results"]:
+            if problemQuestion["score"] == 0 and "suggestion" in problemQuestion:
+                if problemQuestion["suggestion"] != "":
+                    suggestions.append(problemQuestion["suggestion"])
+
+        suggestions = suggestions[:5]
         return {
             "website_url": website_url,
             "company_name": company_name,
             "analysis": analysis,
             "questions": questions,
             "scoring_results": scoring_results,
-            "suggestions": ["Add an llms.txt file"]
+            "suggestions": suggestions,
+            "has_llms_txt": llms_txt_result['found'],
         }
     
     @staticmethod
